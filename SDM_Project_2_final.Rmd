@@ -1,0 +1,560 @@
+---
+title: "Sime Series Analysis for Oil Price Forecasting"
+author: "Lawshia Prabath, Shweta Hatote"
+date: "2023-12-03"
+output: html_document
+---
+
+# **Pre-Processing**
+## **Data Source**
+##### This project relies on a publicly available dataset from Kaggle repository, a reputable and widely utilized resource in the scientific community. Daily oil price. Includes values during both the train and test data timeframes. (Ecuador is an oil-dependent country and it's economical health is highly vulnerable to shocks in oil prices.)
+
+## **Import Data**
+```{r}
+dataframe <- read.csv("oil.csv")
+dataframe$date <- as.Date(dataframe$date)
+```
+
+### Sample input data
+```{r}
+head(dataframe)
+```
+
+## **Exploratory Data Analysis**
+
+### Summary of input data
+```{r}
+summary(dataframe)
+```
+
+
+### Timeseries plot for the data (without imputation)
+
+```{r}
+dataframe$date <- as.Date(dataframe$date)
+
+plot(dataframe$date, dataframe$dcoilwtico, type = "l", 
+     main = "Time Series Plot for dcoilwtico", 
+     xlab = "Date", 
+     ylab = "dcoilwtico values")
+
+```
+
+
+## **Imputation methods**
+
+#### In handling missing data in our time series, we explored three methods: 
+#### 1. Deleting records
+#### 2. KNN imputation with mean values
+#### 3. Statistical-based methods. 
+
+### **Method 1. Deletion Method**
+#### Deleting all the missing value records from the data
+```{r}
+method1_df <- na.omit(dataframe)
+head(method1_df)
+```
+
+### Shape before deleting 
+```{r}
+dim(dataframe)
+```
+
+### Shape after deleting missing records
+```{r}
+dim(method1_df)
+```
+
+### **Method 2. Neighbor Based Method**
+#### Finding the nearest neighbors of the missing values through other attributes, and then updating the missing values with the mean value of these neighbors
+```{r}
+#install.packages("imputeTS")
+library(imputeTS)
+```
+
+```{r}
+#install.packages("VIM")
+library(VIM)
+```
+
+
+```{r}
+dataframe$dcoilwtico <- as.numeric(as.character(dataframe$dcoilwtico))
+dataframe$date <- as.Date(as.character(dataframe$date))
+data_matrix <- data.matrix(dataframe)
+```
+
+```{r}
+head(data_matrix)
+```
+
+
+```{r}
+data_matrix <- data.matrix(dataframe)
+set.seed(123)
+train_indices <- sample(1:nrow(data_matrix), 0.8 * nrow(data_matrix)) 
+train_data <- data_matrix[train_indices, ]
+test_data <- data_matrix[-train_indices, ]
+k_values <- 1:10
+```
+
+```{r}
+mse_values <- sapply(k_values, function(k) {
+  knn_imputed_data <- kNN(train_data, variable = c("dcoilwtico"), k = k)
+  mse <- mean((test_data[, "dcoilwtico"] - knn_imputed_data[-train_indices, "dcoilwtico"])^2, na.rm = TRUE)
+  return(mse)
+})
+
+plot(k_values, mse_values, type = "b", pch = 16, col = "blue", xlab = "K", ylab = "Mean Squared Error", main = "Optimal K Selection")
+
+```
+
+
+#### Since we cannot observe any conrete elbow point here we are going ahead with 8 which has low MSE 
+
+```{r}
+KnnImputation1 <- kNN(data_matrix, variable = c("dcoilwtico"), k = 8)
+
+```
+
+
+
+```{r}
+hist(dataframe$dcoilwtico, main = "KNN Method - Before Imputation", xlab = "Values", col = "lightblue", border = "black")
+```
+
+```{r}
+hist(KnnImputation1$dcoilwtico, main = "KNN Method - After Imputation", xlab = "Values", col = "lightblue", border = "black")
+```
+
+
+## **Method 3. Statistical based methods**
+#### Simple statistical methods just utilize the data in the original data to impute the missing values, such as take the mean value or median value of the attribute to impute 
+
+```{r}
+#install.packages("dplyr")
+library(dplyr)
+```
+
+```{r}
+columns_to_impute <- c("dcoilwtico")
+
+method3_df <- dataframe %>%
+  mutate_at(columns_to_impute, ~ifelse(is.na(.), mean(., na.rm = TRUE), .))
+```
+
+```{r}
+hist(dataframe$dcoilwtico, main = "Mean Method - Before Imputation", xlab = "Values", col = "lightblue", border = "black")
+```
+
+```{r}
+hist(method3_df$dcoilwtico, main = "Mean Method - After Imputation", xlab = "Values", col = "lightblue", border = "black")
+```
+
+
+### **Summary of the data before imputation**
+
+```{r}
+summary(dataframe)
+```
+
+
+### **Summary of the data after deleting records**
+
+```{r}
+summary(method1_df)
+```
+
+### **Summary of the data after KNN imputation**
+
+```{r}
+summary(KnnImputation1)
+```
+
+### **Summary of the data after Mean imputation**
+
+```{r}
+summary(method3_df)
+```
+
+
+
+
+
+### **Time series plot comparison**
+
+#### Timeseries plot for the data (without imputation)
+
+```{r}
+dataframe$date <- as.Date(dataframe$date, format="%d/%m/%y")
+
+plot(dataframe$date, dataframe$dcoilwtico, type = "l", 
+     main = "Time Series - without method", 
+     xlab = "Date", 
+     ylab = "dcoilwtico values")
+
+```
+
+
+#### Timeseries plot for the data (with deletion method)
+
+```{r}
+plot(method1_df$date, method1_df$dcoilwtico, type = "l", 
+     main = "Time Series - Deletion method", 
+     xlab = "Date", 
+     ylab = "dcoilwtico values")
+
+```
+
+
+#### Timeseries plot for the data (with KNN method)
+
+```{r}
+plot(KnnImputation1$date, KnnImputation1$dcoilwtico, type = "l", 
+     main = "Time Series - KNN Imputation", 
+     xlab = "Date", 
+     ylab = "dcoilwtico values")
+
+```
+
+#### Timeseries plot for the data (with Statistical method)
+
+```{r}
+plot(KnnImputation1$date, KnnImputation1$dcoilwtico, type = "l", 
+     main = "Time Series - Mean Imputation", 
+     xlab = "Date", 
+     ylab = "dcoilwtico values")
+
+```
+
+
+#### After careful consideration, we opted for KNN imputation. This choice was influenced by its ability to retain all data points, unlike the deletion method, and its reliance on neighboring data points rather than the entire dataset, as seen in statistical methods. Recognizing the minimal differences among imputation techniques, we found KNN to strike a balance, offering preservation of data integrity and a localized approach for effective imputation in our time series analysis.
+
+### **Check the seasonality** 
+
+### Timeseries plot for the data (with KNN method)
+
+```{r}
+plot(KnnImputation1$date, KnnImputation1$dcoilwtico, type = "l", 
+     main = "Time Series - KNN Imputation", 
+     xlab = "Date", 
+     ylab = "dcoilwtico values")
+
+```
+
+#### There is no evident seasonality in the above graph
+
+
+```{r}
+KnnImputation1 <- subset(KnnImputation1, select = -dcoilwtico_imp)
+head(KnnImputation1)
+```
+
+### **Saving the cleaned data into a excel file**
+
+```{r}
+
+library(openxlsx)
+
+
+excel_file_path <- "final_data.xlsx"
+
+
+write.xlsx(KnnImputation1, excel_file_path, rowNames = FALSE)
+
+```
+
+# **Modelling**
+### **ETS** 
+##### ETS models, also known as Exponential Trend Smoothing models, are a family of statistical forecasting models that are used to forecast time series data characterized by trend and seasonality. They are based on the concept of exponential smoothing, which is a technique for estimating the value of a variable at a future time based on its past values.
+
+### **Components of ETS Models**
+##### ETS models are characterized by three main components:
+##### 1.	Level: The level component represents the current level of the time series. It is estimated using exponential smoothing, which gives more weight to recent observations than the older observations.
+##### 2.	Trend: The trend component represents the underlying trend of the time series. It is estimated using a damped exponential smoothing filter, which allows the trend to change over time.
+##### 3.	Seasonality: The seasonality component represents the seasonal pattern of the time series. It is estimated using a multiplicative seasonal factor, which is applied to the level and trend components.
+
+### **Types of ETS Models**
+##### There are different types of ETS models, depending on the presence and type of trend and seasonality in the time series data. The most common types of ETS models are:
+##### 1.	Simple exponential smoothing (ETS(M,N,N)): This model does not include any trend or seasonality components.
+##### 2.	Holt's linear trend method (ETS(A,N,N)): This model includes a linear trend component but no seasonality component.
+##### 3.	Holt-Winters method (ETS(A,A,N)): This model includes a linear trend component and a multiplicative seasonal component.
+##### 4.	Damped trend method (ETS(A,Ad,N)): This model includes a damped trend component but no seasonality component.
+##### 5.	Damped trend with additive seasonality (ETS(A,Ad,A)): This model includes a damped trend component and an additive seasonal component.
+##### 6.	Damped trend with multiplicative seasonality (ETS(A,Ad,M)): This model includes a damped trend component and a multiplicative seasonal component.
+
+
+##### As we can clearly see that there is no seasonality or trend in our dataset we are going ahead with the following models:
+##### 1.	ETS(A,N,N)
+##### 2.	ETS(M,N,N)
+##### 3.	ETS(A,A,N)
+##### 4.	ARIMA(0,0,0)
+
+```{r}
+#install.packages("forecast")
+#install.packages("readxl")
+library(forecast)
+library(readxl)
+```
+
+```{r}
+final_data <- read_excel("final_data.xlsx")
+
+# Convert the "date" column to Date format
+final_data$date <- as.Date(final_data$date, origin="1970-01-01")
+
+# Extract the univariate time series
+ts_data <- ts(final_data$dcoilwtico, frequency = 1)  # Adjust the frequency based on your data
+```
+
+
+## **Model 1. ETS(A,N,N)**
+
+```{r}
+# Set the length of the training set
+total_length <- length(ts_data)
+train_length <- total_length - 30  
+
+# Split the data into training and testing sets
+train_data <- ts_data[1:train_length]
+test_data <- ts_data[(train_length + 1):total_length]
+
+# Fit the ETS model on the training data
+ets_ann <- ets(train_data, model = "ANN")
+
+# Ljung-Box test on residuals
+ljung_box_test <- Box.test(residuals(ets_ann), lag = 12, type = "Ljung-Box")
+
+# Print the results of the Ljung-Box test
+cat("Ljung-Box Test:\n")
+print(ljung_box_test)
+
+# Print the results
+print(ets_ann)
+
+# Plot the forecasts on the training set
+plot(forecast(ets_ann, h = 30), type = 'b', xlab = 'Time', ylab = 'dcoilwtico')
+abline(h = coef(ets_ann)[names(coef(ets_ann)) == 'intercept'])
+
+# Extract the actual values from the test set
+actual_values <- test_data
+
+# Extract the forecasted values from the ETS model
+forecast_values <- forecast(ets_ann, h = 30)$mean
+
+# Calculate RMSE on the test set
+rmse_ets_ann <- sqrt(mean((actual_values - forecast_values)^2))
+
+# Print RMSE
+cat("RMSE_ETS_ANN:", rmse_ets_ann, "\n")
+```
+
+##### From the Ljung-Box test we get p-value as 0.8624 indicating that there is no significant autocorrelation in the residuals up to the 12th lag. This is a positive result, suggesting that the residuals exhibit no detectable temporal patterns. Hence, the Ljung-Box test suggests that the model residuals do not exhibit significant autocorrelation, supporting the adequacy of the model.
+
+
+## **Model 2. ETS(M,N,N)**
+
+```{r}
+# Set the length of the training set
+total_length <- length(ts_data)
+train_length <- total_length - 30  
+
+# Split the data into training and testing sets
+train_data <- ts_data[1:train_length]
+test_data <- ts_data[(train_length + 1):total_length]
+
+# Fit the ETS model on the training data
+ets_mnn <- ets(train_data, model = "MNN")
+
+# Ljung-Box test on residuals
+ljung_box_test <- Box.test(residuals(ets_mnn), lag = 12, type = "Ljung-Box")
+
+# Print the results of the Ljung-Box test
+cat("Ljung-Box Test:\n")
+print(ljung_box_test)
+
+# Print the results
+print(ets_mnn)
+
+# Plot the forecasts on the training set
+plot(forecast(ets_mnn, h = 30), type = 'b', xlab = 'Time', ylab = 'dcoilwtico')
+abline(h = coef(ets_mnn)[names(coef(ets_mnn)) == 'intercept'])
+
+# Extract the actual values from the test set
+actual_values <- test_data
+
+# Extract the forecasted values from the ETS model
+forecast_values <- forecast(ets_mnn, h = 30)$mean
+
+# Calculate RMSE on the test set
+rmse_ets_mnn <- sqrt(mean((actual_values - forecast_values)^2))
+
+# Print RMSE
+cat("RMSE_ETS_MNN:", rmse_ets_mnn, "\n")
+
+```
+
+##### From the Ljung-Box test we get p-value as 0.8672, suggesting that there is no significant autocorrelation in the residuals up to the 12th lag. This is a positive result, indicating that the residuals do not exhibit detectable temporal patterns. Hence, the Ljung-Box test suggests that the model residuals do not exhibit significant autocorrelation, supporting the adequacy of the model.
+
+## **Model 3. ETS(A,A,N)**
+
+```{r}
+# Set the length of the training set
+total_length <- length(ts_data)
+train_length <- total_length - 30  
+
+# Split the data into training and testing sets
+train_data <- ts_data[1:train_length]
+test_data <- ts_data[(train_length + 1):total_length]
+
+# Fit the ETS model on the training data
+ets_aan <- ets(train_data, model = "AAN")
+
+# Ljung-Box test on residuals
+ljung_box_test <- Box.test(residuals(ets_aan), lag = 12, type = "Ljung-Box")
+
+# Print the results of the Ljung-Box test
+cat("Ljung-Box Test:\n")
+print(ljung_box_test)
+
+# Print the results
+print(ets_aan)
+
+# Plot the forecasts on the training set
+plot(forecast(ets_aan, h = 30), type = 'b', xlab = 'Time', ylab = 'dcoilwtico')
+abline(h = coef(ets_aan)[names(coef(ets_aan)) == 'intercept'])
+
+# Extract the actual values from the test set
+actual_values <- test_data
+
+# Extract the forecasted values from the ETS model
+forecast_values <- forecast(ets_aan, h = 30)$mean
+
+# Calculate RMSE on the test set
+rmse_ets_aan <- sqrt(mean((actual_values - forecast_values)^2))
+
+# Print RMSE
+cat("RMSE_ETS_AAN:", rmse_ets_aan, "\n")
+```
+
+##### From the Ljung-Box test we get p-value as 0.9362, indicating that there is no significant autocorrelation in the residuals up to the 12th lag. This is a positive result, suggesting that the residuals do not exhibit detectable temporal patterns. Hence, the Ljung-Box test suggests that the model residuals do not exhibit significant autocorrelation, supporting the adequacy of the model.
+ 
+## **Model 4. ARIMA**
+
+#### **Determining the orders for an ARIMA model**
+```{r}
+# Determine differencing order (d) for stationarity
+d <- ndiffs(ts_data)
+# Plot ACF and PACF
+acf(ts_data)
+pacf(ts_data)
+# Grid search for p and q
+best_model <- list(order = c(0, d, 0), AIC = Inf)
+for (p in 0:3) {
+  for (q in 0:3) {
+    current_model <- arima(ts_data, order = c(p, d, q))
+    current_aic <- AIC(current_model)
+    if (current_aic < best_model$AIC) {
+      best_model$order <- c(p, d, q)
+      best_model$AIC <- current_aic
+    }
+  }
+}
+# Fit the best model
+final_model <- arima(ts_data, order = best_model$order)
+print(final_model)
+```
+
+##### In this case, it seems to be an ARIMA(1, 1, 2) model, meaning it includes an autoregressive component of order 1, a differencing of order 1, and a moving average component of order 2.
+
+#### **ARIMA (1, 1, 2) model**
+
+```{r}
+# Set the length of the training set
+total_length <- length(ts_data)
+train_length <- total_length - 30 
+
+# Split the data into training and testing sets
+train_data <- ts_data[1:train_length]
+test_data <- ts_data[(train_length + 1):total_length]
+
+# Fit the ARIMA(1,1,2) model on the training data
+arima_112 <- arima(train_data, order = c(1, 1, 2))
+
+# Ljung-Box test on residuals
+ljung_box_test <- Box.test(residuals(arima_112), lag = 12, type = "Ljung-Box")
+
+# Print the results of the Ljung-Box test
+print("Ljung-Box Test:")
+print(ljung_box_test)
+
+# Print the results
+print(arima_112)
+
+# Plot the forecasts on the training set
+plot(forecast(arima_112, h = 30), type = 'b', xlab = 'Time', ylab = 'dcoilwtico')
+abline(h = coef(arima_112)[names(coef(arima_112)) == 'intercept'])
+
+# Extract the actual values from the test set
+actual_values <- test_data
+
+# Extract the forecasted values from the ARIMA model
+forecast_values <- forecast(arima_112, h = 30)$mean
+
+# Calculate RMSE on the test set
+rmse_arima_112 <- sqrt(mean((actual_values - forecast_values)^2))
+
+# Print RMSE
+cat("RMSE_ARIMA_112:", rmse_arima_112, "\n")
+```
+
+##### From the Ljung-Box test we get p-value as 0.8666, indicating that there is no significant autocorrelation in the residuals up to the 12th lag. This is a positive result, suggesting that the residuals do not exhibit detectable temporal patterns. Hence, the Ljung-Box test suggests that the model residuals do not exhibit significant autocorrelation, supporting the adequacy of the model.
+
+
+## **Comparing the RMSE values for all the four models**
+
+```{r}
+cat("RMSE_ETS_ANN:", rmse_ets_ann, "\n")
+cat("RMSE_ETS_MNN:", rmse_ets_mnn, "\n")
+cat("RMSE_ETS_AAN:", rmse_ets_aan, "\n")
+cat("RMSE_ARIMA_112:", rmse_arima_112, "\n")
+```
+
+## **RMSE Values**
+
+```{r}
+# Example data
+values <- c(1.807734, 1.806623, 1.766991, 1.809029)
+categories <- c("ETS_ANN", "ETS_MNN", "ETS_AAN", "ARIMA_112")
+
+# Create a bar plot with light blue color and adjusted y-axis
+barplot(values, col = "lightblue", 
+        names.arg = categories,
+        main = "Model performance",
+        xlab = "Categories",
+        ylab = "Values",
+        ylim = c(0, max(values) + 0.1))  # Adjust the y-axis limits
+
+# Add labels with precise positioning
+# Add labels with dynamic positioning and rotation
+text(1:4, ifelse(values > max(values) - 0.1, values - 0.05, values + 0.05),
+     labels = round(values, 4), col = "black", pos = 3, cex = 0.8)  # Adjust label position and size
+
+
+
+```
+
+
+##### The model with the lowest RMSE is ETS_AAN (Exponential Smoothing State Space Model with Additive Errors, Additive Trend, and No Seasonal Component), with an RMSE of 1.766991.
+
+##### ETS_AAN outperforms the other models in terms of minimizing the average magnitude of errors between actual and forecasted values.
+
+##### While the differences in RMSE values are relatively small, choosing the model with the lowest RMSE is generally a good practice for forecasting, as it indicates better predictive accuracy.
+
+
+
+
+
+##### **Conclusion:**
+
+##### Based on the RMSE values, the ETS_AAN model appears to be the most promising model for forecasting the given time series data among the models we have evaluated.
